@@ -6,14 +6,14 @@ extern crate units;
 mod currencies {
     units! {
         Currency {
-            CurrencyEurope => Euro[euro],
-            CurrencyUS => Dollar[dollar]
+            Euro[euro],
+            Dollar[dollar]
         }
     }
 }
 
 use currencies::Dim;
-use currencies::CurrencyEurope as Euro;
+use currencies::Euro;
 use currencies::f64::{euro, dollar};
 
 #[cfg(not(feature = "unstable"))]

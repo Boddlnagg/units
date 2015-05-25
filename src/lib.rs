@@ -24,7 +24,7 @@ pub trait DimDiv<RHS> { type Out; }
 pub trait DimSqrt { type Out; }
 
 #[macro_export]
-macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),+ } ) => {
+macro_rules! units {( $name:ident { $( $dim:ident[$unit:ident]),+ } ) => {
     use $crate::{DimZero,DimAdd,DimSub,DimMul,DimDiv,DimSqrt,DimFormat};
     use std::marker::PhantomData;
     use std::fmt::{Debug,Formatter,Result};
@@ -241,13 +241,13 @@ macro_rules! __dim_type_alias_helper {
 pub mod si {
     units! {
         SI {
-            Length => Metre[m],
-            Mass => Kilogram[kg],
-            Time => Second[s],
-            Current => Ampere[A],
-            Temperature => Kelvin[K],
-            Amount => Mole[mol],
-            LuminousIntensity => Candela[cd]
+            Length[m],
+            Mass[kg],
+            Time[s],
+            Current[A],
+            Temperature[K],
+            Amount[mol],
+            LuminousIntensity[cd]
         }
     }
 }
