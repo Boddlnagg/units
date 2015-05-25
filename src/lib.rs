@@ -137,7 +137,7 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
         }
     }
     
-    // Mul and Div where LHS is a (dimensionless) f64
+    // Mul where LHS is a (dimensionless) f64
     #[cfg(not(feature = "unstable"))]
     impl<$($dim:NumType<$dim>),+> Mul<$name<f64, $($dim),+>> for f64 {
         type Output = $name<f64, $($dim),+>;
@@ -146,28 +146,12 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
         }
     }
     
-    #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Div<$name<f64, $($dim),+>> for f64 {
-        type Output = $name<f64, $($dim),+>;
-        fn div(self, rhs: $name<f64, $($dim),+>) -> Self::Output {
-            $name::new(self / rhs.amount)
-        }
-    }
-    
-    // Mul and Div where LHS is a (dimensionless) f32
+    // Mul where LHS is a (dimensionless) f32
     #[cfg(not(feature = "unstable"))]
     impl<$($dim:NumType<$dim>),+> Mul<$name<f32, $($dim),+>> for f32 {
         type Output = $name<f32, $($dim),+>;
         fn mul(self, rhs: $name<f32, $($dim),+>) -> Self::Output {
             $name::new(self * rhs.amount)
-        }
-    }
-    
-    #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Div<$name<f32, $($dim),+>> for f32 {
-        type Output = $name<f32, $($dim),+>;
-        fn div(self, rhs: $name<f32, $($dim),+>) -> Self::Output {
-            $name::new(self / rhs.amount)
         }
     }
     
