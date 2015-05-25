@@ -58,15 +58,17 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
     }
     
     // Debug formatting (printing units)
-    // TODO: maybe implement Display? / use Debug for underlying number
-    impl<_N, $($dim:NumType<$dim>),+> Debug for $name<_N, $($dim),+> where _N: ::std::fmt::Display {
+    // TODO: maybe implement Display?
+    impl<_N, $($dim:NumType<$dim>),+> Debug for $name<_N, $($dim),+> where _N:Debug {
         fn fmt(&self, formatter: &mut Formatter) -> Result {
             try!(self.amount.fmt(formatter));
             let mut num: i32;
             $(
                 num = $dim::new().into();
-                if num != 0 {
-                    try!(write!(formatter, " {}^{}", stringify!($unit), num));
+                match num {
+                    0 => (),
+                    1 => try!(write!(formatter, " {}", stringify!($unit))),
+                    _ => try!(write!(formatter, " {}^{:?}", stringify!($unit), num))
                 }
             )+
             Ok(())
