@@ -1,12 +1,12 @@
 extern crate units;
 
-use units::si::{one,m,kg,s};
+use units::si::f64::{one,m,kg,s};
 
 #[cfg(feature = "unstable")]
 #[allow(non_snake_case)]
 fn main() {
-    let N = *units::si::derived::N;
-    let cm = *units::si::derived::cm;
+    let N = kg*m/s/s;
+    let cm = m(1./100.);
     
     let acc = m(2.0)/s/s;
     
@@ -42,8 +42,8 @@ fn main() {
 #[cfg(not(feature = "unstable"))]
 #[allow(non_snake_case)]
 fn main() {
-    let N = *units::si::derived::N;
-    let cm = *units::si::derived::cm;
+    let N = kg*m/s/s;
+    let cm = 1./100.*m;
     
     let Hz = one/s;
     
@@ -52,9 +52,9 @@ fn main() {
     
     println!("{:?}", (acc*m).sqrt() + 3.0*m/s);
     
-    println!("{:?}", 2.0*m*m - 1.0*m * 3.0*cm);
+    println!("{:?}", 2.0*m*m - 1.0*m * (3.0*cm));
     
-    println!("{:?}", 2.0*m / 100.0*cm);
+    println!("{:?}", 2.0*m / (100.0*cm));
     
     let x = ((3.0*kg * acc)/N).sin();
     

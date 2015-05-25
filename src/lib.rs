@@ -2,9 +2,6 @@
 
 extern crate tylar;
 
-#[macro_use]
-extern crate lazy_static;
-
 #[doc(no_inline)]
 pub use tylar::{NumType,Zero,P1};
 #[doc(no_inline,hidden)]
@@ -26,30 +23,43 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
     
     #[derive(Copy,Clone,PartialEq,PartialOrd)]
     #[allow(non_snake_case)]
-    pub struct $name<$($dim:NumType<$dim>=Zero),+> {
-        amount: f64,
+    pub struct $name<_N, $($dim:NumType<$dim>=Zero),+> {
+        amount: _N,
         $($dim: PhantomData<$dim>),+
     }
     
-    // Constructor (private) and some functions
-    impl<$($dim:NumType<$dim>),+> $name<$($dim),+> {
-        fn new(amount: f64)-> $name<$($dim),+> {
-            $name::< $($dim),+ > {
+    // Constructor (private)
+    impl<_N, $($dim:NumType<$dim>),+> $name<_N, $($dim),+> {
+        fn new(amount: _N)-> $name<_N, $($dim),+> {
+            $name::<_N, $($dim),+ > {
                 amount: amount,
                 $($dim: PhantomData),+
             }
         }
-        
-        // TODO: other functions that could be implemented: min, max, abs(?)
+    }
+    
+    // Implement sqrt function if underlying numeric type is f32 or f64
+    // TODO: other functions that could be implemented: min, max, abs(?)
+    
+    impl<$($dim:NumType<$dim>),+> $name<f32, $($dim),+> {
         #[allow(non_camel_case_types,dead_code)]
-        pub fn sqrt<$($unit:NumType<$unit>),+>(self) -> $name<$($unit),+>  /* abuse $unit for Out parameter */
+        pub fn sqrt<$($unit:NumType<$unit>),+>(self) -> $name<f32, $($unit),+>  /* abuse $unit for Out parameter */
+            where $($dim:THalve<$dim,Out=$unit>),+ {
+            $name::new(self.amount.sqrt())
+        }
+    }
+    
+    impl<$($dim:NumType<$dim>),+> $name<f64, $($dim),+> {
+        #[allow(non_camel_case_types,dead_code)]
+        pub fn sqrt<$($unit:NumType<$unit>),+>(self) -> $name<f64, $($unit),+>  /* abuse $unit for Out parameter */
             where $($dim:THalve<$dim,Out=$unit>),+ {
             $name::new(self.amount.sqrt())
         }
     }
     
     // Debug formatting (printing units)
-    impl<$($dim:NumType<$dim>),+> Debug for $name<$($dim),+> {
+    // TODO: maybe implement Display? / use Debug for underlying number
+    impl<_N, $($dim:NumType<$dim>),+> Debug for $name<_N, $($dim),+> where _N: ::std::fmt::Display {
         fn fmt(&self, formatter: &mut Formatter) -> Result {
             try!(self.amount.fmt(formatter));
             let mut num: i32;
@@ -65,19 +75,15 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
     
     // Implementations of Deref and Into<f64> that are only valid for dimensionless quantities
     // (all exponents Zero, which are the default typeparameters)
-    impl Deref for $name {
-        type Target = f64;
+    impl<_N> Deref for $name<_N> {
+        type Target = _N;
         fn deref(&self) -> &Self::Target { &self.amount }
-    }
-    
-    impl Into<f64> for $name {
-        fn into(self) -> f64 { self.amount }
     }
     
     // TODO: Add operators for reference types?
     
     // Addition (only with matching dimensions)
-    impl<$($dim:NumType<$dim>),+> Add for $name<$($dim),+> {
+    impl<_N, $($dim:NumType<$dim>),+> Add for $name<_N, $($dim),+> where _N:Add<_N,Output=_N>  {
         type Output = Self;
         fn add(self, rhs: Self) -> Self::Output {
             $name::new(self.amount + rhs.amount)
@@ -85,7 +91,7 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
     }
     
     // Subtraction (only with matching dimensions)
-    impl<$($dim:NumType<$dim>),+> Sub for $name<$($dim),+> {
+    impl<_N, $($dim:NumType<$dim>),+> Sub for $name<_N, $($dim),+> where _N:Sub<_N,Output=_N> {
         type Output = Self;
         fn sub(self, rhs: Self) -> Self::Output {
             $name::new(self.amount - rhs.amount)
@@ -94,83 +100,96 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
     
     // Multiplications (dimension exponents are added)
     #[allow(non_camel_case_types)]
-    impl<$($dim:NumType<$dim>),+ ,
+    impl<_N, $($dim:NumType<$dim>),+ ,
          $($uname:NumType<$uname>),+ , /* abuse $uname for RHS parameter */
          $($unit:NumType<$unit>),+> /* abuse $unit for Out parameter */
-        Mul<$name<$($uname),+>> for $name<$($dim),+>
-            where $($dim:TAdd<$dim,$uname,Out=$unit>),+ {
+        Mul<$name<_N, $($uname),+>> for $name<_N, $($dim),+>
+            where _N:Mul<_N,Output=_N>, $($dim:TAdd<$dim,$uname,Out=$unit>),+ {
             
-        type Output = $name<$($unit),+>;
-        fn mul(self, rhs: $name<$($uname),+>) -> Self::Output {
+        type Output = $name<_N, $($unit),+>;
+        fn mul(self, rhs: $name<_N, $($uname),+>) -> Self::Output {
             $name::new(self.amount * rhs.amount)
         }
     }
     
     // Division (dimension exponents are subtracted)
     #[allow(non_camel_case_types)]
-    impl<$($dim:NumType<$dim>),+ ,
+    impl<_N, $($dim:NumType<$dim>),+ ,
          $($uname:NumType<$uname>),+ , /* abuse $uname for RHS parameter */
          $($unit:NumType<$unit>),+> /* abuse $unit for Out parameter */
-        Div<$name<$($uname),+>> for $name<$($dim),+>
-            where $($dim:TSub<$dim,$uname,Out=$unit>),+ {
+        Div<$name<_N, $($uname),+>> for $name<_N, $($dim),+>
+            where _N:Div<_N,Output=_N>, $($dim:TSub<$dim,$uname,Out=$unit>),+ {
             
-        type Output = $name<$($unit),+>;
-        fn div(self, rhs: $name<$($uname),+>) -> Self::Output {
+        type Output = $name<_N, $($unit),+>;
+        fn div(self, rhs: $name<_N, $($uname),+>) -> Self::Output {
             $name::new(self.amount / rhs.amount)
         }
     }
     
-    // Mul and Div where one operand is a (dimensionless) float
+    // Mul and Div where LHS is a (dimensionless) f64
     #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Mul<$name<$($dim),+>> for f64 {
-        type Output = $name<$($dim),+>;
-        fn mul(self, rhs: $name<$($dim),+>) -> Self::Output {
+    impl<$($dim:NumType<$dim>),+> Mul<$name<f64, $($dim),+>> for f64 {
+        type Output = $name<f64, $($dim),+>;
+        fn mul(self, rhs: $name<f64, $($dim),+>) -> Self::Output {
             $name::new(self * rhs.amount)
         }
     }
     
     #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Div<$name<$($dim),+>> for f64 {
-        type Output = $name<$($dim),+>;
-        fn div(self, rhs: $name<$($dim),+>) -> Self::Output {
+    impl<$($dim:NumType<$dim>),+> Div<$name<f64, $($dim),+>> for f64 {
+        type Output = $name<f64, $($dim),+>;
+        fn div(self, rhs: $name<f64, $($dim),+>) -> Self::Output {
             $name::new(self / rhs.amount)
         }
     }
-
+    
+    // Mul and Div where LHS is a (dimensionless) f32
     #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Mul<f64> for $name<$($dim),+> {
-        type Output = $name<$($dim),+>;
-        fn mul(self, rhs: f64) -> Self::Output {
-            $name::new(self.amount * rhs)
+    impl<$($dim:NumType<$dim>),+> Mul<$name<f32, $($dim),+>> for f32 {
+        type Output = $name<f32, $($dim),+>;
+        fn mul(self, rhs: $name<f32, $($dim),+>) -> Self::Output {
+            $name::new(self * rhs.amount)
         }
     }
     
     #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Div<f64> for $name<$($dim),+> {
-        type Output = $name<$($dim),+>;
-        fn div(self, rhs: f64) -> Self::Output {
-            $name::new(self.amount / rhs)
+    impl<$($dim:NumType<$dim>),+> Div<$name<f32, $($dim),+>> for f32 {
+        type Output = $name<f32, $($dim),+>;
+        fn div(self, rhs: $name<f32, $($dim),+>) -> Self::Output {
+            $name::new(self / rhs.amount)
         }
     }
     
+    // overload call operator (only if feature = "unstable")
     __dim_fn_call_helper! { [$name], $($dim),+ }
     
     // type alias and constant for the dimensionless type (all exponents are zero)
-    pub type One = $name;
-    
-    #[allow(dead_code,non_upper_case_globals)]
-    pub const one: One = One {
-        amount: 1.0,
-        $($dim: PhantomData),+
-    };
+    pub type One<_N> = $name<_N>;
     
     // generate aliases of the form `pub type $dim1 = $name<Pos1, Zero, Zero, ...>`
     __dim_type_alias_helper! { [$name], $($dim),+ -> P1 }
     
-    $(pub type $uname = $dim;)+
+    $(pub type $uname<_N> = $dim<_N>;)+
     
-    // generate constants of the form `pub const $unit1 = $dim1 { amount: 1.0, ... }`
-    __dim_constants_helper! { [$name], $($dim -> $unit),+ => $($dim),+ }
+    pub mod f64 {
+        use std::marker::PhantomData;
+        pub type One = super::$name<f64>;
+        $(pub type $dim = super::$dim<f64>;)+
+        $(pub type $uname = super::$uname<f64>;)+
+        
+        // generate constants of the form `pub const $unit1 = $dim1 { amount: 1.0, ... }`
+        __dim_constants_helper! { [$name], $($dim -> $unit),+ => $($dim),+ }
+    }
+    
+    pub mod f32 {
+        use std::marker::PhantomData;
+        pub type One = super::$name<f32>;
+        $(pub type $dim = super::$dim<f32>;)+
+        $(pub type $uname = super::$uname<f32>;)+
+        
+        // generate constants of the form `pub const $unit1 = $dim1 { amount: 1.0, ... }`
+        __dim_constants_helper! { [$name], $($dim -> $unit),+ => $($dim),+ }
+    }
 }}
 
 #[macro_export]
@@ -178,10 +197,10 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
 #[cfg(feature = "unstable")]
 macro_rules! __dim_fn_call_helper {
     ( [$name:ident], $($dim:ident),+) => (
-       impl<$($dim:NumType<$dim>),+> ::std::ops::FnOnce<(f64,)> for $name<$($dim),+> {
-            type Output = $name<$($dim),+>;
+       impl<_N, $($dim:NumType<$dim>),+> ::std::ops::FnOnce<(_N,)> for $name<_N, $($dim),+> where _N:Mul<_N,Output=_N> {
+            type Output = $name<_N, $($dim),+>;
             
-            extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+            extern "rust-call" fn call_once(self, args: (_N,)) -> Self::Output {
                 $name::new(self.amount * args.0)
             }
         }
@@ -200,11 +219,11 @@ macro_rules! __dim_fn_call_helper {
 #[doc(hidden)]
 macro_rules! __dim_type_alias_helper {
     ( [$name:ident], $dim:ident -> $($types:ty),+ ) => (
-        pub type $dim = $name<$($types),+>;
+        pub type $dim<_N> = $name<_N, $($types),+>;
     );
     
     ( [$name:ident], $dim:ident, $($dims:ident),* -> $($types:ty),+ ) => (
-        pub type $dim = $name<$($types),+>; __dim_type_alias_helper!( [$name], $($dims),* -> Zero, $($types),+);
+        pub type $dim<_N> = $name<_N, $($types),+>; __dim_type_alias_helper!( [$name], $($dims),* -> Zero, $($types),+);
     )
 }
 
@@ -216,7 +235,14 @@ macro_rules! __dim_constants_helper {
         pub const $unit: $dim = $dim {
             amount: 1.0,
             $($phantom: PhantomData),+
-        }; );
+        };
+        
+        // finally (in the last recursive iteration) also create a constant for dimensionless `one`
+        #[allow(dead_code,non_upper_case_globals)]
+        pub const one: One = One {
+            amount: 1.0,
+            $($phantom: PhantomData),+
+        };);
     
     ( [$name:ident], $dim:ident -> $unit:ident, $($dims:ident -> $units:ident),* => $($phantom:ident),+ ) => (
         #[allow(dead_code,non_upper_case_globals)]
@@ -228,7 +254,6 @@ macro_rules! __dim_constants_helper {
     )
 }
 
-#[allow(non_upper_case_globals)]
 pub mod si {
     units! {
         SI {
@@ -239,35 +264,6 @@ pub mod si {
             Temperature => Kelvin[K],
             Amount => Mole[mol],
             LuminousIntensity => Candela[cd]
-        }
-    }
-    
-    // TODO: Either remove these or add more derived units.
-    //       The complexity of this implementation (lazy_static, etc) might not be justifiable
-    //       given that derived units can easily be defined at use-site (using `let`-constructs)
-    pub mod derived {
-        use tylar::{Zero,P1,N1,N2};
-        use super::{SI,one,m,kg,s,Length};
-    
-        // We need lazy_static! here, because overloaded operators/function calls can't be evaluated in static/const
-        
-        #[cfg(feature = "unstable")]
-        lazy_static! {
-            pub static ref cm: Length = m(1./100.);
-            pub static ref mm: Length = m(1./1000.);
-            pub static ref km: Length = m(1000.);
-        }
-        
-        #[cfg(not(feature = "unstable"))]
-        lazy_static! {
-            pub static ref cm: Length = 1./100.*m;
-            pub static ref mm: Length = 1./1000.*m;
-            pub static ref km: Length = 1000.*m;
-        }
-        
-        lazy_static! {
-            pub static ref N: SI<P1,P1,N2> = kg*m/s/s;
-            pub static ref Hz: SI<Zero,Zero,N1> = one/s;
         }
     }
 }

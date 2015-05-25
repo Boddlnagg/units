@@ -10,29 +10,15 @@ mod currencies {
             CurrencyUS => Dollar[dollar]
         }
     }
-    
-    #[cfg(not(feature = "unstable"))]
-    pub fn euro_to_dollar(a: Euro) -> Dollar {
-        // the conversion factor must not be hard-coded,
-        // but could be retrieved from a database
-        let dollar_per_euro = 1.1006*dollar/euro;
-        a * dollar_per_euro
-    }
-    
-    #[cfg(feature = "unstable")]
-    pub fn euro_to_dollar(a: Euro) -> Dollar {
-        // the conversion factor must not be hard-coded,
-        // but could be retrieved from a database
-        let dollar_per_euro = (dollar/euro)(1.1006);
-        a * dollar_per_euro
-    }
 }
 
-use currencies::{euro, dollar};
+use currencies::f64::{euro, dollar};
 
 #[cfg(not(feature = "unstable"))]
 fn main() {
+    // the conversion factor could also be retrieved from a database
     let dollar_per_euro = 1.1006*dollar/euro;
+    
     let a = 2.0*euro;
     
     let b = a*dollar_per_euro;
