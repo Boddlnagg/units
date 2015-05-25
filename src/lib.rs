@@ -1,4 +1,4 @@
-#![cfg_attr(feature="unstable", feature(unboxed_closures,core))]
+#![cfg_attr(feature="unstable", feature(unboxed_closures, core, zero_one))]
 
 extern crate tylar;
 
@@ -75,11 +75,20 @@ macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),
         }
     }
     
-    // Implementations of Deref and Into<f64> that are only valid for dimensionless quantities
+    // Implementation of Deref that is only valid for dimensionless quantities
     // (all exponents Zero, which are the default typeparameters)
     impl<_N> Deref for $name<_N> {
         type Target = _N;
         fn deref(&self) -> &Self::Target { &self.amount }
+    }
+    
+    // Implementation of Zero (unstable), which is valid for all units, since zero is the only
+    // value that is polymorphic in its unit. std::num::One is deliberately NOT implemented.
+    #[cfg(feature = "unstable")]
+    impl <_N, $($dim:NumType<$dim>),+> ::std::num::Zero for $name<_N, $($dim),+> where _N: ::std::num::Zero {
+        fn zero() -> Self {
+            $name::new(_N::zero())
+        }
     }
     
     // TODO: Add operators for reference types?
