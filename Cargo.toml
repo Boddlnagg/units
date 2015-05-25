@@ -1,0 +1,11 @@
+[package]
+name = "units"
+version = "0.1.0"
+authors = ["Patrick Reisert <kpreisert@gmail.com>"]
+
+[features]
+unstable = []
+
+[dependencies]
+tylar = "0.1.0"
+lazy_static = "0.1.*"
