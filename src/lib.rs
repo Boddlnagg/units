@@ -11,241 +11,230 @@ pub use tylar::Add as TAdd;
 #[doc(no_inline,hidden)]
 pub use tylar::Halve as THalve;
 
-// TODO: try again to make dimension struct generic in underlying number type
+use std::fmt::{Formatter,Result};
+
 // TODO: support documentation comments/attributes for modules and dimensions/units using `$(#[$attr:meta])*` (blocked on rust/#23812)
+
+pub trait DimFormat { fn fmt(&mut Formatter) -> Result; }
+pub trait DimZero {}
+pub trait DimAdd<RHS> { type Out; }
+pub trait DimSub<RHS> { type Out; }
+pub trait DimMul<RHS> { type Out; }
+pub trait DimDiv<RHS> { type Out; }
+pub trait DimSqrt { type Out; }
 
 #[macro_export]
 macro_rules! units {( $name:ident { $( $dim:ident => $uname:ident[$unit:ident]),+ } ) => {
+    use $crate::{DimZero,DimAdd,DimSub,DimMul,DimDiv,DimSqrt,DimFormat};
     use std::marker::PhantomData;
+    use std::fmt::{Debug,Formatter,Result};
     use std::ops::{Add,Sub,Mul,Div,Deref};
-    use std::fmt::{Debug, Formatter, Result};
     use $crate::{NumType,Zero,P1,TAdd,TSub,THalve};
     
-    #[derive(Copy,Clone,PartialEq,PartialOrd)]
-    #[allow(non_snake_case)]
-    pub struct $name<_N, $($dim:NumType<$dim>=Zero),+> {
-        amount: _N,
-        $($dim: PhantomData<$dim>),+
+    // TODO: move as much as possible of the Dim impls out of the macro (using a helper trait)
+    #[derive(Copy,Clone,PartialEq,PartialOrd,Eq,Ord)]    
+    pub struct Dim<D,N=f64> {
+        amount: N,
+        phantom: PhantomData<D>
     }
-    
-    // Constructor (private)
-    impl<_N, $($dim:NumType<$dim>),+> $name<_N, $($dim),+> {
-        fn new(amount: _N)-> $name<_N, $($dim),+> {
-            $name::<_N, $($dim),+ > {
-                amount: amount,
-                $($dim: PhantomData),+
-            }
+
+    impl<D,N> Dim<D,N> {
+        fn new(v: N) -> Self {
+            Dim { amount: v, phantom: PhantomData }
         }
     }
-    
+
+    impl<D:DimFormat,N> Debug for Dim<D,N> where N:Debug {
+        fn fmt(&self, formatter: &mut Formatter) -> Result {
+            try!(self.amount.fmt(formatter));
+            D::fmt(formatter)
+        }
+    }
+
+    // TODO: Add operators for reference types?
+
+    impl<D1,D2,N1,N2> Add<Dim<D2,N2>> for Dim<D1,N1> where D1:DimAdd<D2>, N1:Add<N2> {
+        type Output = Dim<D1::Out, N1::Output>;
+        
+        fn add(self, rhs: Dim<D2,N2>) -> Self::Output {
+            Dim::new(self.amount + rhs.amount)
+        }
+    }
+
+    impl<D1,D2,N1,N2> Sub<Dim<D2,N2>> for Dim<D1,N1> where D1:DimSub<D2>, N1:Sub<N2> {
+        type Output = Dim<D1::Out, N1::Output>;
+        
+        fn sub(self, rhs: Dim<D2,N2>) -> Self::Output {
+            Dim::new(self.amount - rhs.amount)
+        }
+    }
+
+    impl<D1,D2,N1,N2> Mul<Dim<D2,N2>> for Dim<D1,N1> where D1:DimMul<D2>, N1:Mul<N2> {
+        type Output = Dim<D1::Out, N1::Output>;
+        
+        fn mul(self, rhs: Dim<D2,N2>) -> Self::Output {
+            Dim::new(self.amount * rhs.amount)
+        }
+    }
+
+    impl<D1,D2,N1,N2> Div<Dim<D2,N2>> for Dim<D1,N1> where D1:DimDiv<D2>, N1: Div<N2> {
+        type Output = Dim<D1::Out, N1::Output>;
+        
+        fn div(self, rhs: Dim<D2,N2>) -> Self::Output {
+            Dim::new(self.amount / rhs.amount)
+        }
+    }
+
     // Implement sqrt function if underlying numeric type is f32 or f64
     // TODO: other functions that could be implemented: min, max, abs(?)
-    
-    impl<$($dim:NumType<$dim>),+> $name<f32, $($dim),+> {
-        #[allow(non_camel_case_types,dead_code)]
-        pub fn sqrt<$($unit:NumType<$unit>),+>(self) -> $name<f32, $($unit),+>  /* abuse $unit for Out parameter */
-            where $($dim:THalve<$dim,Out=$unit>),+ {
-            $name::new(self.amount.sqrt())
+
+    impl<D1> Dim<D1,f64> where D1:DimSqrt {
+        pub fn sqrt(self) -> Dim<D1::Out,f64> {
+            Dim::new(self.amount.sqrt())
+        }
+    }
+
+    impl<D1> Dim<D1,f32> where D1:DimSqrt {
+        pub fn sqrt(self) -> Dim<D1::Out,f32> {
+            Dim::new(self.amount.sqrt())
+        }
+    }
+
+    // Implementation of Deref that is only valid for dimensionless quantities (all exponents Zero)
+    impl<D:DimZero,N> Deref for Dim<D,N> {
+        type Target = N;
+        fn deref(&self) -> &Self::Target { &self.amount }
+    }
+
+    // Implementation of Zero (unstable), which is valid for all units, since zero is the only
+    // value that is polymorphic in its unit. std::num::One is deliberately NOT implemented.
+    #[cfg(feature = "unstable")]
+    impl <D,N> ::std::num::Zero for Dim<D,N> where N: ::std::num::Zero {
+        fn zero() -> Self {
+            Dim::new(N::zero())
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    impl<D,N> FnOnce<(N,)> for Dim<D,N> where N:Mul<N,Output=N> {
+        type Output = Dim<D,N>;
+        extern "rust-call" fn call_once(self, args: (N,)) -> Self::Output {
+            Dim::new(self.amount * args.0)
+        }
+    }
+
+    // One operand is a (dimensionless) float
+    #[cfg(not(feature = "unstable"))]
+    impl<D> Mul<Dim<D,f64>> for f64 {
+        type Output = Dim<D,f64>;
+        fn mul(self, rhs: Dim<D,f64>) -> Self::Output {
+            Dim::new(self * rhs.amount)
+        }
+    }
+
+    #[cfg(not(feature = "unstable"))]
+    impl<D> Mul<Dim<D,f32>> for f32 {
+        type Output = Dim<D,f32>;
+        fn mul(self, rhs: Dim<D,f32>) -> Self::Output {
+            Dim::new(self * rhs.amount)
         }
     }
     
-    impl<$($dim:NumType<$dim>),+> $name<f64, $($dim),+> {
-        #[allow(non_camel_case_types,dead_code)]
-        pub fn sqrt<$($unit:NumType<$unit>),+>(self) -> $name<f64, $($unit),+>  /* abuse $unit for Out parameter */
-            where $($dim:THalve<$dim,Out=$unit>),+ {
-            $name::new(self.amount.sqrt())
-        }
+    #[derive(Copy,Clone,PartialEq,PartialOrd,Eq,Ord)]
+    #[allow(non_snake_case)]
+    pub struct $name<$($dim:NumType<$dim>=Zero),+> {
+        $($dim: PhantomData<$dim>),+
     }
     
     // Debug formatting (printing units)
     // TODO: maybe implement Display?
-    impl<_N, $($dim:NumType<$dim>),+> Debug for $name<_N, $($dim),+> where _N:Debug {
-        fn fmt(&self, formatter: &mut Formatter) -> Result {
-            try!(self.amount.fmt(formatter));
-            let mut num: i32;
+    impl<$($dim:NumType<$dim>),+> DimFormat for $name<$($dim),+> {
+        fn fmt(formatter: &mut Formatter) -> Result {
+            let mut exp: i32;
             $(
-                num = $dim::new().into();
-                match num {
+                exp = $dim::new().into();
+                match exp {
                     0 => (),
                     1 => try!(write!(formatter, " {}", stringify!($unit))),
-                    _ => try!(write!(formatter, " {}^{:?}", stringify!($unit), num))
+                    _ => try!(write!(formatter, " {}^{:?}", stringify!($unit), exp))
                 }
             )+
             Ok(())
         }
     }
     
-    // Implementation of Deref that is only valid for dimensionless quantities
-    // (all exponents Zero, which are the default typeparameters)
-    impl<_N> Deref for $name<_N> {
-        type Target = _N;
-        fn deref(&self) -> &Self::Target { &self.amount }
-    }
+    impl<$($dim:NumType<$dim>),+> DimAdd<$name<$($dim),+>> for $name<$($dim),+> { type Out = $name<$($dim),+>; }
+
+    impl<$($dim:NumType<$dim>),+> DimSub<$name<$($dim),+>> for $name<$($dim),+> { type Out = $name<$($dim),+>; }
+
+    // In Mul and Div implementations we abuse $unit for the RHS type parameter name
     
-    // Implementation of Zero (unstable), which is valid for all units, since zero is the only
-    // value that is polymorphic in its unit. std::num::One is deliberately NOT implemented.
-    #[cfg(feature = "unstable")]
-    impl <_N, $($dim:NumType<$dim>),+> ::std::num::Zero for $name<_N, $($dim),+> where _N: ::std::num::Zero {
-        fn zero() -> Self {
-            $name::new(_N::zero())
-        }
-    }
-    
-    // TODO: Add operators for reference types?
-    
-    // Addition (only with matching dimensions)
-    impl<_N, $($dim:NumType<$dim>),+> Add for $name<_N, $($dim),+> where _N:Add<_N,Output=_N>  {
-        type Output = Self;
-        fn add(self, rhs: Self) -> Self::Output {
-            $name::new(self.amount + rhs.amount)
-        }
-    }
-    
-    // Subtraction (only with matching dimensions)
-    impl<_N, $($dim:NumType<$dim>),+> Sub for $name<_N, $($dim),+> where _N:Sub<_N,Output=_N> {
-        type Output = Self;
-        fn sub(self, rhs: Self) -> Self::Output {
-            $name::new(self.amount - rhs.amount)
-        }
-    }
-    
-    // Multiplications (dimension exponents are added)
     #[allow(non_camel_case_types)]
-    impl<_N, $($dim:NumType<$dim>),+ ,
-         $($uname:NumType<$uname>),+ , /* abuse $uname for RHS parameter */
-         $($unit:NumType<$unit>),+> /* abuse $unit for Out parameter */
-        Mul<$name<_N, $($uname),+>> for $name<_N, $($dim),+>
-            where _N:Mul<_N,Output=_N>, $($dim:TAdd<$dim,$uname,Out=$unit>),+ {
-            
-        type Output = $name<_N, $($unit),+>;
-        fn mul(self, rhs: $name<_N, $($uname),+>) -> Self::Output {
-            $name::new(self.amount * rhs.amount)
-        }
-    }
+    impl<$($dim:NumType<$dim>),+ , $($unit:NumType<$unit>),+> DimMul<$name<$($unit),+>> for $name<$($dim),+>
+        where $($dim:TAdd<$dim,$unit>),+ { type Out = $name<$(<$dim as TAdd<$dim,$unit>>::Out),+>; }
     
-    // Division (dimension exponents are subtracted)
-    #[allow(non_camel_case_types)]
-    impl<_N, $($dim:NumType<$dim>),+ ,
-         $($uname:NumType<$uname>),+ , /* abuse $uname for RHS parameter */
-         $($unit:NumType<$unit>),+> /* abuse $unit for Out parameter */
-        Div<$name<_N, $($uname),+>> for $name<_N, $($dim),+>
-            where _N:Div<_N,Output=_N>, $($dim:TSub<$dim,$uname,Out=$unit>),+ {
-            
-        type Output = $name<_N, $($unit),+>;
-        fn div(self, rhs: $name<_N, $($uname),+>) -> Self::Output {
-            $name::new(self.amount / rhs.amount)
-        }
-    }
-    
-    // Mul where LHS is a (dimensionless) f64
-    #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Mul<$name<f64, $($dim),+>> for f64 {
-        type Output = $name<f64, $($dim),+>;
-        fn mul(self, rhs: $name<f64, $($dim),+>) -> Self::Output {
-            $name::new(self * rhs.amount)
-        }
-    }
-    
-    // Mul where LHS is a (dimensionless) f32
-    #[cfg(not(feature = "unstable"))]
-    impl<$($dim:NumType<$dim>),+> Mul<$name<f32, $($dim),+>> for f32 {
-        type Output = $name<f32, $($dim),+>;
-        fn mul(self, rhs: $name<f32, $($dim),+>) -> Self::Output {
-            $name::new(self * rhs.amount)
-        }
-    }
-    
-    // overload call operator (only if feature = "unstable")
-    __dim_fn_call_helper! { [$name], $($dim),+ }
-    
-    // type alias and constant for the dimensionless type (all exponents are zero)
-    pub type One<_N> = $name<_N>;
+    #[allow(non_camel_case_types)]    
+    impl<$($dim:NumType<$dim>),+ , $($unit:NumType<$unit>),+> DimDiv<$name<$($unit),+>> for $name<$($dim),+>
+        where $($dim:TSub<$dim,$unit>),+ { type Out = $name<$(<$dim as TSub<$dim,$unit>>::Out),+>; }
+        
+    impl<$($dim:NumType<$dim>),+> DimSqrt for $name<$($dim),+>
+        where $($dim:THalve<$dim>),+ { type Out = $name<$(<$dim as THalve<$dim>>::Out),+>; }
+        
+    // type alias and `DimZero` impl for the dimensionless type (all exponents are zero)
+    pub type One = $name;
+    impl DimZero for One {}
     
     // generate aliases of the form `pub type $dim1 = $name<Pos1, Zero, Zero, ...>`
     __dim_type_alias_helper! { [$name], $($dim),+ -> P1 }
     
-    $(pub type $uname<_N> = $dim<_N>;)+
-    
     pub mod f64 {
         use std::marker::PhantomData;
-        pub type One = super::$name<f64>;
-        $(pub type $dim = super::$dim<f64>;)+
-        $(pub type $uname = super::$uname<f64>;)+
+        use super::{Dim,One,$($dim),+};
         
-        // generate constants of the form `pub const $unit1 = $dim1 { amount: 1.0, ... }`
-        __dim_constants_helper! { [$name], $($dim -> $unit),+ => $($dim),+ }
+        #[allow(non_upper_case_globals, dead_code)]
+        pub const one: Dim<One, f64> = Dim {
+            amount: 1.0,
+            phantom: PhantomData
+        };
+        
+        $(
+        #[allow(non_upper_case_globals, dead_code)]
+        pub const $unit: Dim<$dim, f64> = Dim {
+            amount: 1.0,
+            phantom: PhantomData
+        };
+        )+
     }
     
     pub mod f32 {
         use std::marker::PhantomData;
-        pub type One = super::$name<f32>;
-        $(pub type $dim = super::$dim<f32>;)+
-        $(pub type $uname = super::$uname<f32>;)+
+        use super::{Dim,One,$($dim),+};
         
-        // generate constants of the form `pub const $unit1 = $dim1 { amount: 1.0, ... }`
-        __dim_constants_helper! { [$name], $($dim -> $unit),+ => $($dim),+ }
+        #[allow(non_upper_case_globals, dead_code)]
+        pub const one: Dim<One, f32> = Dim {
+            amount: 1.0,
+            phantom: PhantomData
+        };
+        
+        $(
+        #[allow(non_upper_case_globals, dead_code)]
+        pub const $unit: Dim<$dim, f32> = Dim {
+            amount: 1.0,
+            phantom: PhantomData
+        };
+        )+
     }
 }}
 
 #[macro_export]
 #[doc(hidden)]
-#[cfg(feature = "unstable")]
-macro_rules! __dim_fn_call_helper {
-    ( [$name:ident], $($dim:ident),+) => (
-       impl<_N, $($dim:NumType<$dim>),+> ::std::ops::FnOnce<(_N,)> for $name<_N, $($dim),+> where _N:Mul<_N,Output=_N> {
-            type Output = $name<_N, $($dim),+>;
-            
-            extern "rust-call" fn call_once(self, args: (_N,)) -> Self::Output {
-                $name::new(self.amount * args.0)
-            }
-        }
-    );
-}
-
-#[macro_export]
-#[doc(hidden)]
-#[cfg(not(feature = "unstable"))]
-macro_rules! __dim_fn_call_helper {
-    // Just return nothing (because function call overloading isn't supported in stable Rust)
-    ( [$name:ident], $($dim:ident),+) => ()
-}
-
-#[macro_export]
-#[doc(hidden)]
 macro_rules! __dim_type_alias_helper {
     ( [$name:ident], $dim:ident -> $($types:ty),+ ) => (
-        pub type $dim<_N> = $name<_N, $($types),+>;
+        pub type $dim = $name<$($types),+>;
     );
     
     ( [$name:ident], $dim:ident, $($dims:ident),* -> $($types:ty),+ ) => (
-        pub type $dim<_N> = $name<_N, $($types),+>; __dim_type_alias_helper!( [$name], $($dims),* -> Zero, $($types),+);
-    )
-}
-
-#[macro_export]
-#[doc(hidden)]
-macro_rules! __dim_constants_helper {
-    ( [$name:ident], $dim:ident -> $unit:ident => $($phantom:ident),+ ) => (
-        #[allow(dead_code,non_upper_case_globals)]
-        pub const $unit: $dim = $dim {
-            amount: 1.0,
-            $($phantom: PhantomData),+
-        };
-        
-        // finally (in the last recursive iteration) also create a constant for dimensionless `one`
-        #[allow(dead_code,non_upper_case_globals)]
-        pub const one: One = One {
-            amount: 1.0,
-            $($phantom: PhantomData),+
-        };);
-    
-    ( [$name:ident], $dim:ident -> $unit:ident, $($dims:ident -> $units:ident),* => $($phantom:ident),+ ) => (
-        #[allow(dead_code,non_upper_case_globals)]
-        pub const $unit: $dim = $dim {
-            amount: 1.0,
-            $($phantom: PhantomData),+
-        };
-        __dim_constants_helper!( [$name], $($dims -> $units),* => $($phantom),+);
+        pub type $dim = $name<$($types),+>; __dim_type_alias_helper!( [$name], $($dims),* -> Zero, $($types),+);
     )
 }
 

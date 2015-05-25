@@ -12,7 +12,9 @@ mod currencies {
     }
 }
 
-use currencies::f64::{euro, dollar, Euro};
+use currencies::Dim;
+use currencies::CurrencyEurope as Euro;
+use currencies::f64::{euro, dollar};
 
 #[cfg(not(feature = "unstable"))]
 fn main() {
@@ -23,7 +25,7 @@ fn main() {
     let b = a*dollar_per_euro;
     println!("{:?} = {:?}", a, b);
     
-    let euro2dollar = |x: Euro| x * dollar_per_euro;
+    let euro2dollar = |x: Dim<Euro,_>| x * dollar_per_euro;
     println!("{:?} = {:?}", 4.0*euro, euro2dollar(4.0*euro));
     
     let c = 3.0*dollar;
@@ -39,7 +41,7 @@ fn main() {
     let b = a*dollar_per_euro;
     println!("{:?} = {:?}", a, b);
     
-    let euro2dollar = |x: Euro| x * dollar_per_euro;
+    let euro2dollar = |x: Dim<Euro,_>| x * dollar_per_euro;
     println!("{:?} = {:?}", euro(4.0), euro2dollar(euro(4.0)));
     
     let c = dollar(3.0);
