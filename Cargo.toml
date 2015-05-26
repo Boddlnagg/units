@@ -2,7 +2,7 @@
 name = "units"
 version = "0.0.1"
 authors = ["Patrick Reisert <kpreisert@gmail.com>"]
-description = "Units of Measurement for Rust. Easy to use, type-safe and customizable."
+description = "Units of Measure for Rust. Easy to use, type-safe and customizable."
 repository = "https://github.com/Boddlnagg/units"
 keywords = ["type-level"]
 license = "MIT"
