@@ -117,17 +117,13 @@ macro_rules! units {( $name:ident { $( $dim:ident[$unit:ident]),+ } ) => {
         }
     }
 
-    #[cfg(feature = "unstable")]
-    impl<D,N> FnOnce<(N,)> for $name<D,N> where N:Mul<N,Output=N> {
-        type Output = $name<D,N>;
-        extern "rust-call" fn call_once(self, args: (N,)) -> Self::Output {
-            $name::new(self.amount * args.0)
-        }
-    }
+    // This was moved to a helper macro, because conditional compilation did
+    // not work correctly ("rust-call" not available in stable Rust)
+    __dim_fn_call_helper!($name);
 
     // One operand is a (dimensionless) float
     #[cfg(not(feature = "unstable"))]
-    impl<D> Mul<Dim<D,f64>> for f64 {
+    impl<D> Mul<$name<D,f64>> for f64 {
         type Output = $name<D,f64>;
         fn mul(self, rhs: $name<D,f64>) -> Self::Output {
             $name::new(self * rhs.amount)
@@ -238,6 +234,28 @@ macro_rules! __dim_type_alias_helper {
     ( $dim:ident, $($dims:ident),* -> $($types:ty),+ ) => (
         pub type $dim = Unit<$($types),+>; __dim_type_alias_helper!( $($dims),* -> Zero, $($types),+);
     )
+}
+
+#[macro_export]
+#[doc(hidden)]
+#[cfg(feature = "unstable")]
+macro_rules! __dim_fn_call_helper {
+    ($name:ident) => (
+       impl<D,N> FnOnce<(N,)> for $name<D,N> where N:Mul<N,Output=N> {
+            type Output = $name<D,N>;
+            extern "rust-call" fn call_once(self, args: (N,)) -> Self::Output {
+                $name::new(self.amount * args.0)
+            }
+        }
+    );
+}
+
+#[macro_export]
+#[doc(hidden)]
+#[cfg(not(feature = "unstable"))]
+macro_rules! __dim_fn_call_helper {
+    // Just return nothing (because function call overloading isn't supported in stable Rust)
+    ($name:ident) => ()
 }
 
 pub mod si {
