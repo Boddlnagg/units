@@ -1,4 +1,4 @@
-# units [![crates.io](https://img.shields.io/crates/v/units.svg)](https://crates.io/crates/units)
+# units [![crates.io](https://img.shields.io/crates/v/units.svg)](https://crates.io/crates/units) [![Build Status](https://travis-ci.org/Boddlnagg/units.svg?branch=master)](https://travis-ci.org/Boddlnagg/units)
 
 **Units of Measure** for Rust. Easy to use, type-safe and customizable.
 
