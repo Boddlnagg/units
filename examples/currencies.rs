@@ -1,7 +1,6 @@
-#![cfg_attr(feature="unstable", feature(unboxed_closures,core,zero_one))]
+#![cfg_attr(feature="unstable", feature(unboxed_closures, core, zero_one))]
 
-#[macro_use]
-extern crate units;
+#[macro_use] extern crate units;
 
 mod currencies {
     units! {

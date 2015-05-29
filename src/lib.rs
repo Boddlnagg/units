@@ -140,13 +140,13 @@ macro_rules! units {( $name:ident { $( $dim:ident[$unit:ident]),+ } ) => {
     
     #[derive(Copy,Clone,PartialEq,PartialOrd,Eq,Ord)]
     #[allow(non_snake_case)]
-    pub struct Unit<$($dim:NumType<$dim>=Zero),+> {
+    pub struct Unit<$($dim:NumType=Zero),+> {
         $($dim: PhantomData<$dim>),+
     }
     
     // Debug formatting (printing units)
     // TODO: maybe implement Display?
-    impl<$($dim:NumType<$dim>),+> UnitFormat for Unit<$($dim),+> {
+    impl<$($dim:NumType),+> UnitFormat for Unit<$($dim),+> {
         fn fmt(formatter: &mut Formatter) -> Result {
             let mut exp: i32;
             $(
@@ -161,22 +161,22 @@ macro_rules! units {( $name:ident { $( $dim:ident[$unit:ident]),+ } ) => {
         }
     }
     
-    impl<$($dim:NumType<$dim>),+> UnitAdd<Unit<$($dim),+>> for Unit<$($dim),+> { type Out = Unit<$($dim),+>; }
+    impl<$($dim:NumType),+> UnitAdd<Unit<$($dim),+>> for Unit<$($dim),+> { type Out = Unit<$($dim),+>; }
 
-    impl<$($dim:NumType<$dim>),+> UnitSub<Unit<$($dim),+>> for Unit<$($dim),+> { type Out = Unit<$($dim),+>; }
+    impl<$($dim:NumType),+> UnitSub<Unit<$($dim),+>> for Unit<$($dim),+> { type Out = Unit<$($dim),+>; }
 
     // In Mul and Div implementations we abuse $unit for the RHS type parameter name
     
     #[allow(non_camel_case_types)]
-    impl<$($dim:NumType<$dim>),+ , $($unit:NumType<$unit>),+> UnitMul<Unit<$($unit),+>> for Unit<$($dim),+>
-        where $($dim:TAdd<$dim,$unit>),+ { type Out = Unit<$(<$dim as TAdd<$dim,$unit>>::Out),+>; }
+    impl<$($dim:NumType),+ , $($unit:NumType),+> UnitMul<Unit<$($unit),+>> for Unit<$($dim),+>
+        where $($dim:TAdd<$unit>),+ { type Out = Unit<$(<$dim as TAdd<$unit>>::Out),+>; }
     
     #[allow(non_camel_case_types)]    
-    impl<$($dim:NumType<$dim>),+ , $($unit:NumType<$unit>),+> UnitDiv<Unit<$($unit),+>> for Unit<$($dim),+>
-        where $($dim:TSub<$dim,$unit>),+ { type Out = Unit<$(<$dim as TSub<$dim,$unit>>::Out),+>; }
+    impl<$($dim:NumType),+ , $($unit:NumType),+> UnitDiv<Unit<$($unit),+>> for Unit<$($dim),+>
+        where $($dim:TSub<$unit>),+ { type Out = Unit<$(<$dim as TSub<$unit>>::Out),+>; }
         
-    impl<$($dim:NumType<$dim>),+> UnitSqrt for Unit<$($dim),+>
-        where $($dim:THalve<$dim>),+ { type Out = Unit<$(<$dim as THalve<$dim>>::Out),+>; }
+    impl<$($dim:NumType),+> UnitSqrt for Unit<$($dim),+>
+        where $($dim:THalve),+ { type Out = Unit<$(<$dim as THalve>::Out),+>; }
         
     // type alias and `UnitZero` impl for the dimensionless type (all exponents are zero)
     pub type One = Unit;
@@ -258,16 +258,12 @@ macro_rules! __dim_fn_call_helper {
     ($name:ident) => ()
 }
 
-pub mod si {
+// Macro invocation inside private module to make sure that the macro works as intended
+mod smoke_test {
     units! {
-        SI {
-            Length[m],
-            Mass[kg],
-            Time[s],
-            Current[A],
-            Temperature[K],
-            Amount[mol],
-            LuminousIntensity[cd]
+        Units {
+            Meter[m],
+            Second[s]
         }
     }
 }
