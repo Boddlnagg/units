@@ -1,0 +1,18 @@
+language: rust
+
+# run builds for both the nightly and stable branch
+rust:
+  - nightly
+  - stable
+
+# load travis-cargo (see https://github.com/huonw/travis-cargo)
+before_script:
+  - |
+      pip install 'travis-cargo<0.2' --user &&
+      export PATH=$HOME/.local/bin:$PATH
+
+# the main build
+script:
+  - |
+      travis-cargo build &&
+      travis-cargo test
