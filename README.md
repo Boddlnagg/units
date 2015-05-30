@@ -44,7 +44,7 @@ fn main() {
     println!("{} miles", *(result_in_miles/mile)); // This will print `0.103561865372889 miles`
 
     // Now we want to know how long a ball will fall until it reaches the
-    // floor if dropped from a height of 10 meters
+    // floor if dropped from a height of 1.5 meters
     let height = 1.5*m;
     let g = 9.81*m/s/s; // Use a gravitational constant of 9.81 m/s^2
     let time = (2. * height / g).sqrt(); // sqrt() takes care of the units
